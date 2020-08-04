@@ -12,6 +12,8 @@
 #include <random>
 #include <vector>
 
+#include <stdio>
+
 #ifdef _OPENMP
 #include <omp.h>
 #endif
@@ -129,6 +131,8 @@ TEST_P(fbgemmu8s8acc16WithQuantGranularityTest, Test) {
         continue;
       }
       int k_per_group = k / groups;
+
+printf("AA m, n, k, %d %d %d groups %d\n", m,n,k,groups);
 
       aligned_vector<uint8_t> Aint8(m * k);
 
@@ -379,6 +383,8 @@ TEST_P(fbgemmu8s8acc16WithQuantGranularityTest, SpMDMTest) {
           continue;
         }
         int k_per_group = k / groups;
+
+printf("A1 m, n, k, %d %d %d groups %d\n", m,n,k,groups);
 
         aligned_vector<uint8_t> Aint8(m * k);
         aligned_vector<int8_t> Bint8(k * n);
@@ -707,6 +713,8 @@ TEST_P(fbgemmu8s8acc16Test, NoRequantizeTest) {
         continue;
       }
       int k_per_group = k / groups;
+
+printf("A2 m, n, k, %d %d %d groups %d\n", m,n,k,groups);
 
       aligned_vector<uint8_t> Aint8(m * k);
 
