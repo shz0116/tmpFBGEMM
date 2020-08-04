@@ -12,8 +12,6 @@
 #include <random>
 #include <vector>
 
-#include <stdio>
-
 #ifdef _OPENMP
 #include <omp.h>
 #endif
