@@ -27,7 +27,7 @@ template <
     bool B_SYMMETRIC,
     QuantizationGranularity Q_GRAN,
     typename BIAS_TYPE>
-static ALWAYS_INLINE void depthwise_3x3x3_kernel_(
+static ALWAYS_INLINE void depthwise_3d_kernel_(
     int T,
     int H,
     int W,
@@ -36,6 +36,7 @@ static ALWAYS_INLINE void depthwise_3x3x3_kernel_(
     int t,
     int h,
     int w,
+    array<int, 3> F,
     int stride_t,
     int stride_h,
     int stride_w,
@@ -52,8 +53,9 @@ static ALWAYS_INLINE void depthwise_3x3x3_kernel_(
     const BIAS_TYPE* bias,
     const float* act_times_w_scale,
     GenI8Depthwise::jit_kernel_signature* pregenerated_kernel = nullptr) {
-  constexpr int R = 3, S = 3;
-  constexpr int PAD_P = 1, PAD_T = 1, PAD_B = 1, PAD_L = 1, PAD_R = 1;
+  int R = F[1], S = F[2];
+  int PAD_P = (F[0] - 1) / 2, PAD_T = (F[1] - 1) / 2, PAD_B = PAD_T,
+      PAD_L = (F[2] - 1) / 2, PAD_R = PAD_L;
   int H_OUT = (H + PAD_T + PAD_B - R) / stride_h + 1;
   int W_OUT = (W + PAD_L + PAD_R - S) / stride_w + 1;
   int t_in = -PAD_P + t * stride_t;
@@ -69,16 +71,16 @@ static ALWAYS_INLINE void depthwise_3x3x3_kernel_(
       ? *pregenerated_kernel
       : GenI8Depthwise().getOrCreate(
             /*D=*/3,
-            /*F=*/{3, 3, 3},
+            F,
             OC / IC,
             /*compute_a_sum=*/!B_SYMMETRIC,
             remainder,
             /*prev_skip=*/std::max(-t_in, 0),
-            /*next_skip=*/std::max(t_in + 3 - T, 0),
+            /*next_skip=*/std::max(t_in + F[0] - T, 0),
             /*top_skip=*/std::max(-h_in, 0),
-            /*bottom_skip=*/std::max(h_in + 3 - H, 0),
+            /*bottom_skip=*/std::max(h_in + F[1] - H, 0),
             /*left_skip=*/std::max(-w_in, 0),
-            /*right_skip=*/std::max(w_in + 3 - W, 0));
+            /*right_skip=*/std::max(w_in + F[2] - W, 0));
   kernel(
       A + ((t_in * H + h_in) * W + w_in) * IC,
       Bp,
@@ -127,13 +129,14 @@ template <
     bool B_SYMMETRIC,
     typename BIAS_TYPE,
     QuantizationGranularity Q_GRAN>
-static ALWAYS_INLINE void depthwise_3x3x3_pad_1_(
+static ALWAYS_INLINE void depthwise_3d_same_pad_(
     int N,
     int T,
     int H,
     int W,
     int IC,
     int OC,
+    array<int, 3> F,
     int stride_t,
     int stride_h,
     int stride_w,
@@ -151,9 +154,9 @@ static ALWAYS_INLINE void depthwise_3x3x3_pad_1_(
     int thread_id,
     int num_threads) {
   assert(IC % 8 == 0);
-  constexpr int K_T = 3, K_H = 3, K_W = 3;
-  constexpr int PAD_P = 1, PAD_N = 1, PAD_T = 1, PAD_B = 1, PAD_L = 1,
-                PAD_R = 1;
+  int K_T = F[0], K_H = F[1], K_W = F[2];
+  int PAD_P = (F[0] - 1) / 2, PAD_N = PAD_P, PAD_T = (F[1] - 1) / 2,
+      PAD_B = PAD_T, PAD_L = (F[2] - 1) / 2, PAD_R = PAD_L;
   int T_OUT = (T + PAD_P + PAD_N - K_T) / stride_t + 1;
   int H_OUT = (H + PAD_T + PAD_B - K_H) / stride_h + 1;
   int W_OUT = (W + PAD_L + PAD_R - K_W) / stride_w + 1;
@@ -188,7 +191,7 @@ static ALWAYS_INLINE void depthwise_3x3x3_pad_1_(
       int h;
       for (h = h_begin; h < PAD_T; ++h) {
         for (int w = 0; w < W_OUT; ++w) {
-          depthwise_3x3x3_kernel_<
+          depthwise_3d_kernel_<
               FUSE_RELU,
               HAS_BIAS,
               A_SYMMETRIC,
@@ -202,6 +205,7 @@ static ALWAYS_INLINE void depthwise_3x3x3_pad_1_(
               t,
               h,
               w,
+              F,
               stride_t,
               stride_h,
               stride_w,
@@ -223,7 +227,7 @@ static ALWAYS_INLINE void depthwise_3x3x3_pad_1_(
       for (; h < std::min(H_OUT - PAD_B - stride_h + 1, h_end); ++h) {
         int w;
         for (w = 0; w < PAD_L; ++w) {
-          depthwise_3x3x3_kernel_<
+          depthwise_3d_kernel_<
               FUSE_RELU,
               HAS_BIAS,
               A_SYMMETRIC,
@@ -237,6 +241,7 @@ static ALWAYS_INLINE void depthwise_3x3x3_pad_1_(
               t,
               h,
               w,
+              F,
               stride_t,
               stride_h,
               stride_w,
@@ -264,18 +269,18 @@ static ALWAYS_INLINE void depthwise_3x3x3_pad_1_(
             int t_in = -PAD_P + t * stride_t;
             kernel = GenI8Depthwise().getOrCreate(
                 /*D=*/3,
-                /*F=*/{3, 3, 3},
+                F,
                 OC / IC,
                 /*compute_a_sum=*/!B_SYMMETRIC,
                 remainder,
                 /*prev_skip=*/std::max(-t_in, 0),
-                /*next_skip=*/std::max(t_in + 3 - T, 0),
+                /*next_skip=*/std::max(t_in + F[0] - T, 0),
                 0,
                 0,
                 0,
                 0);
           }
-          depthwise_3x3x3_kernel_<
+          depthwise_3d_kernel_<
               FUSE_RELU,
               HAS_BIAS,
               A_SYMMETRIC,
@@ -289,6 +294,7 @@ static ALWAYS_INLINE void depthwise_3x3x3_pad_1_(
               t,
               h,
               w,
+              F,
               stride_t,
               stride_h,
               stride_w,
@@ -308,7 +314,7 @@ static ALWAYS_INLINE void depthwise_3x3x3_pad_1_(
         } // w
 
         for (; w < W_OUT; ++w) {
-          depthwise_3x3x3_kernel_<
+          depthwise_3d_kernel_<
               FUSE_RELU,
               HAS_BIAS,
               A_SYMMETRIC,
@@ -322,6 +328,7 @@ static ALWAYS_INLINE void depthwise_3x3x3_pad_1_(
               t,
               h,
               w,
+              F,
               stride_t,
               stride_h,
               stride_w,
@@ -342,7 +349,7 @@ static ALWAYS_INLINE void depthwise_3x3x3_pad_1_(
 
       for (; h < h_end; ++h) {
         for (int w = 0; w < W_OUT; ++w) {
-          depthwise_3x3x3_kernel_<
+          depthwise_3d_kernel_<
               FUSE_RELU,
               HAS_BIAS,
               A_SYMMETRIC,
@@ -356,6 +363,7 @@ static ALWAYS_INLINE void depthwise_3x3x3_pad_1_(
               t,
               h,
               w,
+              F,
               stride_t,
               stride_h,
               stride_w,
@@ -379,7 +387,7 @@ static ALWAYS_INLINE void depthwise_3x3x3_pad_1_(
       int h;
       for (h = h_begin; h < PAD_T; ++h) {
         for (int w = 0; w < W_OUT; ++w) {
-          depthwise_3x3x3_kernel_<
+          depthwise_3d_kernel_<
               FUSE_RELU,
               HAS_BIAS,
               A_SYMMETRIC,
@@ -393,6 +401,7 @@ static ALWAYS_INLINE void depthwise_3x3x3_pad_1_(
               t,
               h,
               w,
+              F,
               stride_t,
               stride_h,
               stride_w,
@@ -414,7 +423,7 @@ static ALWAYS_INLINE void depthwise_3x3x3_pad_1_(
       for (; h < std::min(H_OUT - PAD_B - stride_h + 1, h_end); ++h) {
         int w;
         for (w = 0; w < PAD_L; ++w) {
-          depthwise_3x3x3_kernel_<
+          depthwise_3d_kernel_<
               FUSE_RELU,
               HAS_BIAS,
               A_SYMMETRIC,
@@ -428,6 +437,7 @@ static ALWAYS_INLINE void depthwise_3x3x3_pad_1_(
               t,
               h,
               w,
+              F,
               stride_t,
               stride_h,
               stride_w,
@@ -453,7 +463,7 @@ static ALWAYS_INLINE void depthwise_3x3x3_pad_1_(
             }
             middle_kernel = GenI8Depthwise().getOrCreate(
                 /*D=*/3,
-                /*F=*/{3, 3, 3},
+                F,
                 OC / IC,
                 /*compute_a_sum=*/!B_SYMMETRIC,
                 remainder,
@@ -464,7 +474,7 @@ static ALWAYS_INLINE void depthwise_3x3x3_pad_1_(
                 0,
                 0);
           }
-          depthwise_3x3x3_kernel_<
+          depthwise_3d_kernel_<
               FUSE_RELU,
               HAS_BIAS,
               A_SYMMETRIC,
@@ -478,6 +488,7 @@ static ALWAYS_INLINE void depthwise_3x3x3_pad_1_(
               t,
               h,
               w,
+              F,
               stride_t,
               stride_h,
               stride_w,
@@ -497,7 +508,7 @@ static ALWAYS_INLINE void depthwise_3x3x3_pad_1_(
         }
 
         for (; w < W_OUT; ++w) {
-          depthwise_3x3x3_kernel_<
+          depthwise_3d_kernel_<
               FUSE_RELU,
               HAS_BIAS,
               A_SYMMETRIC,
@@ -511,6 +522,7 @@ static ALWAYS_INLINE void depthwise_3x3x3_pad_1_(
               t,
               h,
               w,
+              F,
               stride_t,
               stride_h,
               stride_w,
@@ -531,7 +543,7 @@ static ALWAYS_INLINE void depthwise_3x3x3_pad_1_(
 
       for (; h < h_end; ++h) {
         for (int w = 0; w < W_OUT; ++w) {
-          depthwise_3x3x3_kernel_<
+          depthwise_3d_kernel_<
               FUSE_RELU,
               HAS_BIAS,
               A_SYMMETRIC,
@@ -545,6 +557,7 @@ static ALWAYS_INLINE void depthwise_3x3x3_pad_1_(
               t,
               h,
               w,
+              F,
               stride_t,
               stride_h,
               stride_w,
@@ -568,7 +581,7 @@ static ALWAYS_INLINE void depthwise_3x3x3_pad_1_(
       int h;
       for (h = h_begin; h < PAD_T; ++h) {
         for (int w = 0; w < W_OUT; ++w) {
-          depthwise_3x3x3_kernel_<
+          depthwise_3d_kernel_<
               FUSE_RELU,
               HAS_BIAS,
               A_SYMMETRIC,
@@ -582,6 +595,7 @@ static ALWAYS_INLINE void depthwise_3x3x3_pad_1_(
               t,
               h,
               w,
+              F,
               stride_t,
               stride_h,
               stride_w,
@@ -603,7 +617,7 @@ static ALWAYS_INLINE void depthwise_3x3x3_pad_1_(
       for (; h < std::min(H_OUT - PAD_B - stride_h + 1, h_end); ++h) {
         int w;
         for (w = 0; w < PAD_L; ++w) {
-          depthwise_3x3x3_kernel_<
+          depthwise_3d_kernel_<
               FUSE_RELU,
               HAS_BIAS,
               A_SYMMETRIC,
@@ -617,6 +631,7 @@ static ALWAYS_INLINE void depthwise_3x3x3_pad_1_(
               t,
               h,
               w,
+              F,
               stride_t,
               stride_h,
               stride_w,
@@ -644,18 +659,18 @@ static ALWAYS_INLINE void depthwise_3x3x3_pad_1_(
             int t_in = -PAD_P + t * stride_t;
             kernel = GenI8Depthwise().getOrCreate(
                 /*D=*/3,
-                /*F=*/{3, 3, 3},
+                F,
                 OC / IC,
                 /*compute_a_sum=*/!B_SYMMETRIC,
                 remainder,
                 /*prev_skip=*/std::max(-t_in, 0),
-                /*next_skip=*/std::max(t_in + 3 - T, 0),
+                /*next_skip=*/std::max(t_in + F[0] - T, 0),
                 0,
                 0,
                 0,
                 0);
           }
-          depthwise_3x3x3_kernel_<
+          depthwise_3d_kernel_<
               FUSE_RELU,
               HAS_BIAS,
               A_SYMMETRIC,
@@ -669,6 +684,7 @@ static ALWAYS_INLINE void depthwise_3x3x3_pad_1_(
               t,
               h,
               w,
+              F,
               stride_t,
               stride_h,
               stride_w,
@@ -688,7 +704,7 @@ static ALWAYS_INLINE void depthwise_3x3x3_pad_1_(
         } // w
 
         for (; w < W_OUT; ++w) {
-          depthwise_3x3x3_kernel_<
+          depthwise_3d_kernel_<
               FUSE_RELU,
               HAS_BIAS,
               A_SYMMETRIC,
@@ -702,6 +718,7 @@ static ALWAYS_INLINE void depthwise_3x3x3_pad_1_(
               t,
               h,
               w,
+              F,
               stride_t,
               stride_h,
               stride_w,
@@ -722,7 +739,7 @@ static ALWAYS_INLINE void depthwise_3x3x3_pad_1_(
 
       for (; h < h_end; ++h) {
         for (int w = 0; w < W_OUT; ++w) {
-          depthwise_3x3x3_kernel_<
+          depthwise_3d_kernel_<
               FUSE_RELU,
               HAS_BIAS,
               A_SYMMETRIC,
@@ -736,6 +753,7 @@ static ALWAYS_INLINE void depthwise_3x3x3_pad_1_(
               t,
               h,
               w,
+              F,
               stride_t,
               stride_h,
               stride_w,
@@ -764,13 +782,14 @@ template <
     bool HAS_BIAS,
     typename BIAS_TYPE,
     QuantizationGranularity Q_GRAN>
-static void depthwise_3x3x3_pad_1_(
+static void depthwise_3d_same_pad_(
     int N,
     int T,
     int H,
     int W,
     int IC,
     int OC,
+    array<int, 3> F,
     int stride_t,
     int stride_h,
     int stride_w,
@@ -790,7 +809,7 @@ static void depthwise_3x3x3_pad_1_(
       fbgemmAlignedAlloc(64, (OC + 31) / 32 * 32 * sizeof(int32_t)));
   if (A_zero_point == 0 || col_offsets == nullptr) {
     if (Q_GRAN == QuantizationGranularity::TENSOR && B_zero_point[0] == 0) {
-      depthwise_3x3x3_pad_1_<
+      depthwise_3d_same_pad_<
           FUSE_RELU,
           HAS_BIAS,
           true /*A_symmetric*/,
@@ -803,6 +822,7 @@ static void depthwise_3x3x3_pad_1_(
           W,
           IC,
           OC,
+          F,
           stride_t,
           stride_h,
           stride_w,
@@ -820,7 +840,7 @@ static void depthwise_3x3x3_pad_1_(
           thread_id,
           num_threads);
     } else {
-      depthwise_3x3x3_pad_1_<
+      depthwise_3d_same_pad_<
           FUSE_RELU,
           HAS_BIAS,
           true /*A_symmetric*/,
@@ -833,6 +853,7 @@ static void depthwise_3x3x3_pad_1_(
           W,
           IC,
           OC,
+          F,
           stride_t,
           stride_h,
           stride_w,
@@ -852,7 +873,7 @@ static void depthwise_3x3x3_pad_1_(
     }
   } else {
     if (Q_GRAN == QuantizationGranularity::TENSOR && B_zero_point[0] == 0) {
-      depthwise_3x3x3_pad_1_<
+      depthwise_3d_same_pad_<
           FUSE_RELU,
           HAS_BIAS,
           false /*A_symmetric*/,
@@ -865,6 +886,7 @@ static void depthwise_3x3x3_pad_1_(
           W,
           IC,
           OC,
+          F,
           stride_t,
           stride_h,
           stride_w,
@@ -882,7 +904,7 @@ static void depthwise_3x3x3_pad_1_(
           thread_id,
           num_threads);
     } else {
-      depthwise_3x3x3_pad_1_<
+      depthwise_3d_same_pad_<
           FUSE_RELU,
           HAS_BIAS,
           false /*A_symmetric*/,
@@ -895,6 +917,7 @@ static void depthwise_3x3x3_pad_1_(
           W,
           IC,
           OC,
+          F,
           stride_t,
           stride_h,
           stride_w,
@@ -918,13 +941,14 @@ static void depthwise_3x3x3_pad_1_(
 
 // Dispatch HAS_BIAS
 template <bool FUSE_RELU, typename BIAS_TYPE, QuantizationGranularity Q_GRAN>
-static void depthwise_3x3x3_pad_1_(
+static void depthwise_3d_same_pad_(
     int N,
     int T,
     int H,
     int W,
     int IC,
     int OC,
+    array<int, 3> F,
     int stride_t,
     int stride_h,
     int stride_w,
@@ -941,13 +965,14 @@ static void depthwise_3x3x3_pad_1_(
     int thread_id,
     int num_threads) {
   if (bias) {
-    depthwise_3x3x3_pad_1_<FUSE_RELU, true /*HAS_BIAS*/, BIAS_TYPE, Q_GRAN>(
+    depthwise_3d_same_pad_<FUSE_RELU, true /*HAS_BIAS*/, BIAS_TYPE, Q_GRAN>(
         N,
         T,
         H,
         W,
         IC,
         OC,
+        F,
         stride_t,
         stride_h,
         stride_w,
@@ -964,13 +989,14 @@ static void depthwise_3x3x3_pad_1_(
         thread_id,
         num_threads);
   } else {
-    depthwise_3x3x3_pad_1_<FUSE_RELU, false /*HAS_BIAS*/, BIAS_TYPE, Q_GRAN>(
+    depthwise_3d_same_pad_<FUSE_RELU, false /*HAS_BIAS*/, BIAS_TYPE, Q_GRAN>(
         N,
         T,
         H,
         W,
         IC,
         OC,
+        F,
         stride_t,
         stride_h,
         stride_w,
@@ -991,13 +1017,14 @@ static void depthwise_3x3x3_pad_1_(
 
 // Dispatch FUSE_RELU
 template <QuantizationGranularity Q_GRAN, typename BIAS_TYPE>
-void depthwise_3x3x3_pad_1(
+void depthwise_3d_same_pad(
     int N,
     int T,
     int H,
     int W,
     int IC,
     int OC,
+    array<int, 3> F,
     int stride_t,
     int stride_h,
     int stride_w,
@@ -1014,10 +1041,11 @@ void depthwise_3x3x3_pad_1(
     const float* act_times_w_scale,
     int thread_id,
     int num_threads) {
-  if (B.GetKernelProduct() != 3 * 3 * 3) {
+  if (B.GetKernelProduct() != F[0] * F[1] * F[2]) {
     string msg =
         "[FBGEMM_CONV_ERROR] Packed weight is expected to have kernel_prod " +
-        to_string(3 * 3 * 3) + " but has " + to_string(B.GetKernelProduct());
+        to_string(F[0] * F[1] * F[2]) + " but has " +
+        to_string(B.GetKernelProduct());
     throw logic_error(msg);
   }
   if (stride_t == 0 || stride_h == 0 || stride_w == 0 || num_threads == 0) {
@@ -1031,13 +1059,14 @@ void depthwise_3x3x3_pad_1(
     return;
   }
   if (fuse_relu) {
-    depthwise_3x3x3_pad_1_<true /*FUSE_RELU*/, BIAS_TYPE, Q_GRAN>(
+    depthwise_3d_same_pad_<true /*FUSE_RELU*/, BIAS_TYPE, Q_GRAN>(
         N,
         T,
         H,
         W,
         IC,
         OC,
+        F,
         stride_t,
         stride_h,
         stride_w,
@@ -1054,13 +1083,14 @@ void depthwise_3x3x3_pad_1(
         thread_id,
         num_threads);
   } else {
-    depthwise_3x3x3_pad_1_<false /*FUSE_RELU*/, BIAS_TYPE, Q_GRAN>(
+    depthwise_3d_same_pad_<false /*FUSE_RELU*/, BIAS_TYPE, Q_GRAN>(
         N,
         T,
         H,
         W,
         IC,
         OC,
+        F,
         stride_t,
         stride_h,
         stride_w,
@@ -1079,13 +1109,14 @@ void depthwise_3x3x3_pad_1(
   }
 }
 
-template FBGEMM_API void depthwise_3x3x3_pad_1<QuantizationGranularity::TENSOR>(
+template FBGEMM_API void depthwise_3d_same_pad<QuantizationGranularity::TENSOR>(
     int N,
     int T,
     int H,
     int W,
     int IC,
     int OC,
+    array<int, 3> F,
     int stride_t,
     int stride_h,
     int stride_w,
@@ -1103,13 +1134,14 @@ template FBGEMM_API void depthwise_3x3x3_pad_1<QuantizationGranularity::TENSOR>(
     int thread_id,
     int num_threads);
 
-template FBGEMM_API void depthwise_3x3x3_pad_1<QuantizationGranularity::TENSOR>(
+template FBGEMM_API void depthwise_3d_same_pad<QuantizationGranularity::TENSOR>(
     int N,
     int T,
     int H,
     int W,
     int IC,
     int OC,
+    array<int, 3> F,
     int stride_t,
     int stride_h,
     int stride_w,
@@ -1127,13 +1159,14 @@ template FBGEMM_API void depthwise_3x3x3_pad_1<QuantizationGranularity::TENSOR>(
     int thread_id,
     int num_threads);
 
-template FBGEMM_API void depthwise_3x3x3_pad_1<QuantizationGranularity::GROUP>(
+template FBGEMM_API void depthwise_3d_same_pad<QuantizationGranularity::GROUP>(
     int N,
     int T,
     int H,
     int W,
     int IC,
     int OC,
+    array<int, 3> F,
     int stride_t,
     int stride_h,
     int stride_w,
@@ -1151,13 +1184,14 @@ template FBGEMM_API void depthwise_3x3x3_pad_1<QuantizationGranularity::GROUP>(
     int thread_id,
     int num_threads);
 
-template FBGEMM_API void depthwise_3x3x3_pad_1<QuantizationGranularity::GROUP>(
+template FBGEMM_API void depthwise_3d_same_pad<QuantizationGranularity::GROUP>(
     int N,
     int T,
     int H,
     int W,
     int IC,
     int OC,
+    array<int, 3> F,
     int stride_t,
     int stride_h,
     int stride_w,
@@ -1176,13 +1210,14 @@ template FBGEMM_API void depthwise_3x3x3_pad_1<QuantizationGranularity::GROUP>(
     int num_threads);
 
 template FBGEMM_API void
-depthwise_3x3x3_pad_1<QuantizationGranularity::OUT_CHANNEL>(
+depthwise_3d_same_pad<QuantizationGranularity::OUT_CHANNEL>(
     int N,
     int T,
     int H,
     int W,
     int IC,
     int OC,
+    array<int, 3> F,
     int stride_t,
     int stride_h,
     int stride_w,
@@ -1201,13 +1236,14 @@ depthwise_3x3x3_pad_1<QuantizationGranularity::OUT_CHANNEL>(
     int num_threads);
 
 template FBGEMM_API void
-depthwise_3x3x3_pad_1<QuantizationGranularity::OUT_CHANNEL>(
+depthwise_3d_same_pad<QuantizationGranularity::OUT_CHANNEL>(
     int N,
     int T,
     int H,
     int W,
     int IC,
     int OC,
+    array<int, 3> F,
     int stride_t,
     int stride_h,
     int stride_w,
@@ -1227,12 +1263,13 @@ depthwise_3x3x3_pad_1<QuantizationGranularity::OUT_CHANNEL>(
 
 // Old interface
 template <typename BIAS_TYPE>
-void depthwise_3x3x3_pad_1(
+void depthwise_3d_same_pad(
     int N,
     int T,
     int H,
     int W,
     int IC_OC,
+    array<int, 3> F,
     int stride_t,
     int stride_h,
     int stride_w,
@@ -1249,13 +1286,14 @@ void depthwise_3x3x3_pad_1(
     float act_times_w_scale,
     int thread_id,
     int num_threads) {
-  depthwise_3x3x3_pad_1<QuantizationGranularity::TENSOR>(
+  depthwise_3d_same_pad<QuantizationGranularity::TENSOR>(
       N,
       T,
       H,
       W,
       IC_OC,
       IC_OC,
+      F,
       stride_t,
       stride_h,
       stride_w,
@@ -1275,12 +1313,13 @@ void depthwise_3x3x3_pad_1(
 }
 
 template <typename BIAS_TYPE>
-void depthwise_3x3x3_per_channel_quantization_pad_1(
+void depthwise_3d_per_channel_quantization_same_pad(
     int N,
     int T,
     int H,
     int W,
     int IC_OC,
+    array<int, 3> F,
     int stride_t,
     int stride_h,
     int stride_w,
@@ -1297,13 +1336,14 @@ void depthwise_3x3x3_per_channel_quantization_pad_1(
     const float* act_times_w_scale,
     int thread_id,
     int num_threads) {
-  depthwise_3x3x3_pad_1<QuantizationGranularity::OUT_CHANNEL>(
+  depthwise_3d_same_pad<QuantizationGranularity::OUT_CHANNEL>(
       N,
       T,
       H,
       W,
       IC_OC,
       IC_OC,
+      F,
       stride_t,
       stride_h,
       stride_w,
@@ -1321,6 +1361,346 @@ void depthwise_3x3x3_per_channel_quantization_pad_1(
       thread_id,
       num_threads);
 };
+
+template FBGEMM_API void depthwise_3d_same_pad(
+    int N,
+    int T,
+    int H,
+    int W,
+    int IC_OC,
+    array<int, 3> F,
+    int stride_t,
+    int stride_h,
+    int stride_w,
+    int32_t A_zero_point,
+    const uint8_t* A,
+    int32_t B_zero_point,
+    const PackedDepthWiseConvMatrix& B,
+    float C_multiplier,
+    int32_t C_zero_point,
+    uint8_t* C,
+    const int32_t* col_offsets,
+    const int32_t* bias,
+    bool fuse_relu,
+    float act_times_w_scale,
+    int thread_id,
+    int num_threads);
+
+template FBGEMM_API void depthwise_3d_same_pad(
+    int N,
+    int T,
+    int H,
+    int W,
+    int IC_OC,
+    array<int, 3> F,
+    int stride_t,
+    int stride_h,
+    int stride_w,
+    int32_t A_zero_point,
+    const uint8_t* A,
+    int32_t B_zero_point,
+    const PackedDepthWiseConvMatrix& B,
+    float C_multiplier,
+    int32_t C_zero_point,
+    uint8_t* C,
+    const int32_t* col_offsets,
+    const float* bias,
+    bool fuse_relu,
+    float act_times_w_scale,
+    int thread_id,
+    int num_threads);
+
+template FBGEMM_API void depthwise_3d_per_channel_quantization_same_pad(
+    int N,
+    int T,
+    int H,
+    int W,
+    int IC_OC,
+    array<int, 3> F,
+    int stride_t,
+    int stride_h,
+    int stride_w,
+    int32_t A_zero_point,
+    const uint8_t* A,
+    const int32_t* B_zero_point,
+    const PackedDepthWiseConvMatrix& B,
+    const float* C_multiplier,
+    int32_t C_zero_point,
+    uint8_t* C,
+    const int32_t* col_offsets,
+    const int32_t* bias,
+    bool fuse_relu,
+    const float* act_times_w_scale,
+    int thread_id,
+    int num_threads);
+
+template FBGEMM_API void depthwise_3d_per_channel_quantization_same_pad(
+    int N,
+    int T,
+    int H,
+    int W,
+    int IC_OC,
+    array<int, 3> F,
+    int stride_t,
+    int stride_h,
+    int stride_w,
+    int32_t A_zero_point,
+    const uint8_t* A,
+    const int32_t* B_zero_point,
+    const PackedDepthWiseConvMatrix& B,
+    const float* C_multiplier,
+    int32_t C_zero_point,
+    uint8_t* C,
+    const int32_t* col_offsets,
+    const float* bias,
+    bool fuse_relu,
+    const float* act_times_w_scale,
+    int thread_id,
+    int num_threads);
+
+template <QuantizationGranularity Q_GRAN, typename BIAS_TYPE>
+FBGEMM_API void depthwise_3x3x3_pad_1(
+    int N,
+    int T,
+    int H,
+    int W,
+    int IC,
+    int OC,
+    int stride_t,
+    int stride_h,
+    int stride_w,
+    int32_t A_zero_point,
+    const uint8_t* A,
+    const int32_t* B_zero_point,
+    const PackedDepthWiseConvMatrix& Bp,
+    const float* C_multiplier,
+    int32_t C_zero_point,
+    uint8_t* C,
+    const int32_t* col_offsets,
+    const BIAS_TYPE* bias,
+    bool fuse_relu,
+    const float* act_times_w_scale,
+    int thread_id,
+    int num_threads) {
+  depthwise_3d_same_pad<Q_GRAN, BIAS_TYPE>(
+      N,
+      T,
+      H,
+      W,
+      IC,
+      OC,
+      {3, 3, 3},
+      stride_t,
+      stride_h,
+      stride_w,
+      A_zero_point,
+      A,
+      B_zero_point,
+      Bp,
+      C_multiplier,
+      C_zero_point,
+      C,
+      col_offsets,
+      bias,
+      fuse_relu,
+      act_times_w_scale,
+      thread_id,
+      num_threads);
+}
+
+template FBGEMM_API void depthwise_3x3x3_pad_1<QuantizationGranularity::TENSOR>(
+    int N,
+    int T,
+    int H,
+    int W,
+    int IC,
+    int OC,
+    int stride_t,
+    int stride_h,
+    int stride_w,
+    int32_t A_zero_point,
+    const uint8_t* A,
+    const int32_t* B_zero_point,
+    const PackedDepthWiseConvMatrix& B,
+    const float* C_multiplier,
+    int32_t C_zero_point,
+    uint8_t* C,
+    const int32_t* col_offsets,
+    const int32_t* bias,
+    bool fuse_relu,
+    const float* act_times_w_scale,
+    int thread_id,
+    int num_threads);
+
+template FBGEMM_API void depthwise_3x3x3_pad_1<QuantizationGranularity::TENSOR>(
+    int N,
+    int T,
+    int H,
+    int W,
+    int IC,
+    int OC,
+    int stride_t,
+    int stride_h,
+    int stride_w,
+    int32_t A_zero_point,
+    const uint8_t* A,
+    const int32_t* B_zero_point,
+    const PackedDepthWiseConvMatrix& B,
+    const float* C_multiplier,
+    int32_t C_zero_point,
+    uint8_t* C,
+    const int32_t* col_offsets,
+    const float* bias,
+    bool fuse_relu,
+    const float* act_times_w_scale,
+    int thread_id,
+    int num_threads);
+
+template FBGEMM_API void depthwise_3x3x3_pad_1<QuantizationGranularity::GROUP>(
+    int N,
+    int T,
+    int H,
+    int W,
+    int IC,
+    int OC,
+    int stride_t,
+    int stride_h,
+    int stride_w,
+    int32_t A_zero_point,
+    const uint8_t* A,
+    const int32_t* B_zero_point,
+    const PackedDepthWiseConvMatrix& B,
+    const float* C_multiplier,
+    int32_t C_zero_point,
+    uint8_t* C,
+    const int32_t* col_offsets,
+    const int32_t* bias,
+    bool fuse_relu,
+    const float* act_times_w_scale,
+    int thread_id,
+    int num_threads);
+
+template FBGEMM_API void depthwise_3x3x3_pad_1<QuantizationGranularity::GROUP>(
+    int N,
+    int T,
+    int H,
+    int W,
+    int IC,
+    int OC,
+    int stride_t,
+    int stride_h,
+    int stride_w,
+    int32_t A_zero_point,
+    const uint8_t* A,
+    const int32_t* B_zero_point,
+    const PackedDepthWiseConvMatrix& B,
+    const float* C_multiplier,
+    int32_t C_zero_point,
+    uint8_t* C,
+    const int32_t* col_offsets,
+    const float* bias,
+    bool fuse_relu,
+    const float* act_times_w_scale,
+    int thread_id,
+    int num_threads);
+
+template FBGEMM_API void
+depthwise_3x3x3_pad_1<QuantizationGranularity::OUT_CHANNEL>(
+    int N,
+    int T,
+    int H,
+    int W,
+    int IC,
+    int OC,
+    int stride_t,
+    int stride_h,
+    int stride_w,
+    int32_t A_zero_point,
+    const uint8_t* A,
+    const int32_t* B_zero_point,
+    const PackedDepthWiseConvMatrix& B,
+    const float* C_multiplier,
+    int32_t C_zero_point,
+    uint8_t* C,
+    const int32_t* col_offsets,
+    const int32_t* bias,
+    bool fuse_relu,
+    const float* act_times_w_scale,
+    int thread_id,
+    int num_threads);
+
+template FBGEMM_API void
+depthwise_3x3x3_pad_1<QuantizationGranularity::OUT_CHANNEL>(
+    int N,
+    int T,
+    int H,
+    int W,
+    int IC,
+    int OC,
+    int stride_t,
+    int stride_h,
+    int stride_w,
+    int32_t A_zero_point,
+    const uint8_t* A,
+    const int32_t* B_zero_point,
+    const PackedDepthWiseConvMatrix& B,
+    const float* C_multiplier,
+    int32_t C_zero_point,
+    uint8_t* C,
+    const int32_t* col_offsets,
+    const float* bias,
+    bool fuse_relu,
+    const float* act_times_w_scale,
+    int thread_id,
+    int num_threads);
+
+template <typename BIAS_TYPE>
+FBGEMM_API void depthwise_3x3x3_pad_1(
+    int N,
+    int T,
+    int H,
+    int W,
+    int IC_OC,
+    int stride_t,
+    int stride_h,
+    int stride_w,
+    int32_t A_zero_point,
+    const uint8_t* A,
+    int32_t B_zero_point,
+    const PackedDepthWiseConvMatrix& Bp,
+    float C_multiplier,
+    int32_t C_zero_point,
+    uint8_t* C,
+    const int32_t* col_offsets,
+    const BIAS_TYPE* bias,
+    bool fuse_relu,
+    float act_times_w_scale,
+    int thread_id,
+    int num_threads) {
+  depthwise_3d_same_pad<BIAS_TYPE>(
+      N,
+      T,
+      H,
+      W,
+      IC_OC,
+      {3, 3, 3},
+      stride_t,
+      stride_h,
+      stride_w,
+      A_zero_point,
+      A,
+      B_zero_point,
+      Bp,
+      C_multiplier,
+      C_zero_point,
+      C,
+      col_offsets,
+      bias,
+      fuse_relu,
+      act_times_w_scale,
+      thread_id,
+      num_threads);
+}
 
 template FBGEMM_API void depthwise_3x3x3_pad_1(
     int N,
@@ -1367,6 +1747,54 @@ template FBGEMM_API void depthwise_3x3x3_pad_1(
     float act_times_w_scale,
     int thread_id,
     int num_threads);
+
+template <typename BIAS_TYPE>
+FBGEMM_API void depthwise_3x3x3_per_channel_quantization_pad_1(
+    int N,
+    int T,
+    int H,
+    int W,
+    int IC_OC,
+    int stride_t,
+    int stride_h,
+    int stride_w,
+    int32_t A_zero_point,
+    const uint8_t* A,
+    const int32_t* B_zero_point,
+    const PackedDepthWiseConvMatrix& Bp,
+    const float* C_multiplier,
+    int32_t C_zero_point,
+    uint8_t* C,
+    const int32_t* col_offsets,
+    const BIAS_TYPE* bias,
+    bool fuse_relu,
+    const float* act_times_w_scale,
+    int thread_id,
+    int num_threads) {
+  depthwise_3d_per_channel_quantization_same_pad<BIAS_TYPE>(
+      N,
+      T,
+      H,
+      W,
+      IC_OC,
+      {3, 3, 3},
+      stride_t,
+      stride_h,
+      stride_w,
+      A_zero_point,
+      A,
+      B_zero_point,
+      Bp,
+      C_multiplier,
+      C_zero_point,
+      C,
+      col_offsets,
+      bias,
+      fuse_relu,
+      act_times_w_scale,
+      thread_id,
+      num_threads);
+}
 
 template FBGEMM_API void depthwise_3x3x3_per_channel_quantization_pad_1(
     int N,
