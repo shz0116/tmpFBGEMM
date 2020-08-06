@@ -3,10 +3,10 @@ name: FBGEMMCI
 on:
   push:
     branches:
-      - master
+      - B400
   pull_request:
     branches:
-      - master
+      - B400
 
 jobs:
   build1:
