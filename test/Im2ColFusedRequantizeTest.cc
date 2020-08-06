@@ -232,7 +232,7 @@ static void Im2colTest(bool b_symmetric) {
     } // for each groups
   } // for each shape
 }
-
+/*
 TEST_P(fbgemmIm2colTest, Acc32Test) {
   QuantizationGranularity q_granularity;
   bool b_symmetric;
@@ -258,7 +258,7 @@ TEST_P(fbgemmIm2colTest, Acc16Test) {
     Im2colTest<int16_t, QuantizationGranularity::OUT_CHANNEL>(b_symmetric);
   }
 }
-
+*/
 template <QuantizationGranularity Q_GRAN>
 void SConvTest() {
   for (auto conv_p : shapes) {
@@ -466,7 +466,7 @@ void SConvTest() {
     } // for each groups
   } // for each shape
 }
-
+/**
 TEST_P(fbgemmIm2colTest, SConvTest) {
   QuantizationGranularity q_granularity;
   bool b_symmetric;
@@ -480,7 +480,7 @@ TEST_P(fbgemmIm2colTest, SConvTest) {
     SConvTest<QuantizationGranularity::OUT_CHANNEL>();
   }
 }
-
+**/
 static vector<conv_param_t<3>> shapes_3d = {
     // MB, IC, OC, IT, IH, IW, G, KT, KH, KW, stride_t, stride_h, stride_w,
     // pad_t, pad_h, pad_w
