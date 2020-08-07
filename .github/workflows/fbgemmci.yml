@@ -41,6 +41,8 @@ jobs:
     - name: Test static FBGEMM lib
       shell: cmd
       run: |
+        set OMP_NUM_THREADS=1
+        echo %OMP_NUM_THREADS%
         echo %cd%
         cd build_static
         test\Im2ColFusedRequantizeTest.exe
