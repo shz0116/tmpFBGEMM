@@ -177,7 +177,7 @@ void fbgemmPacked(
             outProcess,
             th_info,
             blocking_params);
-    printf("Finished stage 3 for g = %d\n", g);
+    printf("Finished stage 3 for g = %d ibegin=%d iend=%d MCB=%d\n", g, i_begin, i_end, MCB);
 
     for (int i = i_begin; i < i_end; i += MCB) { // i is the element index
       mc = std::min(i_end - i, MCB);
@@ -196,9 +196,9 @@ void fbgemmPacked(
         t_start = std::chrono::high_resolution_clock::now();
 #endif
 
-        printf("Finished stage 4 for g = %d\n", g);
+        if (kb == 0) printf("Finished stage 4 for g = %d\n", g);
         exeKernelObj.execute(g * kBlocks + kb);
-        printf("Finished stage 5 for g = %d\n", g);
+        if (kb == 0) printf("Finished stage 5 for g = %d\n", g);
 
 #ifdef FBGEMM_MEASURE_TIME_BREAKDOWN
         t_end = std::chrono::high_resolution_clock::now();
@@ -210,7 +210,7 @@ void fbgemmPacked(
 #endif
       }
     }
-    printf("Finished stage 6 for g = %d\n", g);
+    printf("Finished stage 6 for g = %d kb=0 kBlocks=%d\n", g, kBlocks);
   } // for each group
 
 #ifdef FBGEMM_MEASURE_TIME_BREAKDOWN
