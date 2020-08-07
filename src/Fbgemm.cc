@@ -46,12 +46,26 @@ void fbgemmPacked(
           typename packingBMatrix::accType>::value,
       "Accumulation type of both matrices should be the same");
 
+  printf("Entering fbgemmPacked\n");  
   // Run time CPU detection
   if (!cpuinfo_initialize()) {
     throw std::runtime_error("Failed to initialize cpuinfo!");
   }
-  if ((!fbgemmHasAvx512VnniSupport() && !fbgemmHasAvx512Support() &&
-       !fbgemmHasAvx2Support())) {
+
+  printf("Finished initialization\n");
+
+  int t1 = fbgemmHasAvx512VnniSupport();
+  printf("Finished fbgemmHasAvx512VnniSupport = %d\n", t1);
+  int t2 = fbgemmHasAvx512Support();
+  printf("Finished fbgemmHasAvx512Support = %d\n", t2);
+  int t3 = fbgemmHasAvx2Support();
+  printf("Finished fbgemmHasAvx2Support = %d\n", t3);
+
+  if ((!t1 && !t2 &&
+       !t3)) {
+
+    printf("unknow architecture!\n");
+
     assert(0 && "unknown architecure");
     throw std::runtime_error("unknown architecure");
   }
@@ -59,6 +73,8 @@ void fbgemmPacked(
   int MCB;
   int KCB;
   int MR;
+
+  printf("Finished initializetion %p \n", blocking_params);
 
   if (blocking_params) {
     MCB = blocking_params->MCB;
@@ -100,6 +116,8 @@ void fbgemmPacked(
         throw std::runtime_error("unknown architecure");
     }
   }
+
+  printf("Finished stage1\n");
 
   if (!packB.isPrePacked()) {
     throw std::runtime_error("B matrix must be prepacked");
@@ -146,6 +164,8 @@ void fbgemmPacked(
   fbgemmPartition1DBlocked(
       th_info.m_thread_id, th_info.m_num_threads, MDim, MR, i_begin, i_end);
 
+  printf("Finished stage 2\n");
+
   for (int g = g_begin; g < g_end; ++g) {
     ExecuteKernel<packingAMatrix, packingBMatrix, cT, processOutputType>
         exeKernelObj(
@@ -157,6 +177,8 @@ void fbgemmPacked(
             outProcess,
             th_info,
             blocking_params);
+    printf("Finished stage 3 for g = %d\n", g);
+
     for (int i = i_begin; i < i_end; i += MCB) { // i is the element index
       mc = std::min(i_end - i, MCB);
       for (int kb = 0; kb < kBlocks; ++kb) { // kb is the block index
@@ -174,7 +196,9 @@ void fbgemmPacked(
         t_start = std::chrono::high_resolution_clock::now();
 #endif
 
+        printf("Finished stage 4 for g = %d\n", g);
         exeKernelObj.execute(g * kBlocks + kb);
+        printf("Finished stage 5 for g = %d\n", g);
 
 #ifdef FBGEMM_MEASURE_TIME_BREAKDOWN
         t_end = std::chrono::high_resolution_clock::now();
@@ -186,6 +210,7 @@ void fbgemmPacked(
 #endif
       }
     }
+    printf("Finished stage 6 for g = %d\n", g);
   } // for each group
 
 #ifdef FBGEMM_MEASURE_TIME_BREAKDOWN
