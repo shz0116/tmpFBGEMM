@@ -565,6 +565,8 @@ static void Im2col3DTest(bool b_symmetric) {
       if (conv_p.IC % groups != 0 || conv_p.OC % groups != 0) {
         continue;
       }
+      GTEST_COUT << "Start OC= " << conv_p.OC << " group= " << groups << std::endl;
+
       conv_p.G = groups;
       aligned_vector<uint8_t> Aint8(
           conv_p.MB * conv_p.IN_DIM[0] * conv_p.IN_DIM[1] * conv_p.IN_DIM[2] *
@@ -612,6 +614,8 @@ static void Im2col3DTest(bool b_symmetric) {
       int KDim = conv_p.K[0] * conv_p.K[1] * conv_p.K[2] * conv_p.IC;
       int KDimPerGroup = KDim / conv_p.G;
 
+      GTEST_COUT << "Point 1" << std::endl;
+
       // computing row offset
       vector<int32_t> row_offsets(MDim);
       vector<uint8_t> Aint8_im2col(MDim * KDim);
@@ -630,12 +634,16 @@ static void Im2col3DTest(bool b_symmetric) {
             ncols_per_quant_group);
       }
 
+      GTEST_COUT << "Point 2" << std::endl;
+
       conv_ref(
           conv_p,
           Aint8.data(),
           Aint8_zero_point,
           Bint8.data(),
           Cint32_ref.data());
+
+      GTEST_COUT << "Point 3" << std::endl;
 
       for (int g = 0; g < conv_p.G; ++g) {
         row_offsets_u8acc32_ref(
@@ -661,6 +669,7 @@ static void Im2col3DTest(bool b_symmetric) {
             ncols_per_quant_group);
       }
 
+      GTEST_COUT << "Point 4 reference " << std::endl;
       PackBMatrix<int8_t, ACC_T> packedB(
           matrix_op_t::NoTranspose,
           KDim,
@@ -670,6 +679,7 @@ static void Im2col3DTest(bool b_symmetric) {
           nullptr,
           conv_p.G);
 
+      GTEST_COUT << "Point 5" << std::endl;
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
@@ -677,6 +687,7 @@ static void Im2col3DTest(bool b_symmetric) {
         vector<int32_t> row_offset_buf(
             PackAWithIm2Col<uint8_t, ACC_T, 3>::rowOffsetBufferSize());
 
+        GTEST_COUT << "Point 6" << std::endl;
         PackAWithIm2Col<uint8_t, ACC_T, 3> packA(
             conv_p,
             Aint8.data(),
@@ -685,6 +696,7 @@ static void Im2col3DTest(bool b_symmetric) {
             row_offset_buf.data(),
             b_symmetric);
 
+        GTEST_COUT << "Point 7" << std::endl;
         DoNothing<> doNothingObj{};
         ReQuantizeOutput<false, Q_GRAN> outputProcObj(
             doNothingObj,
@@ -698,6 +710,7 @@ static void Im2col3DTest(bool b_symmetric) {
             conv_p.G * NDim,
             conv_p.G);
 
+        GTEST_COUT << "Point 8" << std::endl;
         int num_threads = fbgemm_get_num_threads();
         int tid = fbgemm_get_thread_num();
 
@@ -710,8 +723,10 @@ static void Im2col3DTest(bool b_symmetric) {
             outputProcObj,
             tid,
             num_threads);
+        GTEST_COUT << "Point 9" << std::endl;
       } // omp parallel
 
+      GTEST_COUT << "Point 10" << std::endl;
       // correctness check
       for (int n = 0; n < conv_p.MB; ++n) {
         for (int t = 0; t < conv_p.OUT_DIM[0]; ++t) {
@@ -738,10 +753,12 @@ static void Im2col3DTest(bool b_symmetric) {
           }
         }
       }
+      GTEST_COUT << "Point 11" << std::endl;
     } // for each groups
   } // for each shape
 }
 
+/**
 TEST_P(fbgemmIm2colTest, 3DAcc32Test) {
   QuantizationGranularity q_granularity;
   bool b_symmetric;
@@ -758,6 +775,7 @@ TEST_P(fbgemmIm2colTest, 3DAcc32Test) {
   }
 }
 
+**/
 TEST_P(fbgemmIm2colTest, 3DAcc16Test) {
   QuantizationGranularity q_granularity;
   bool b_symmetric;
