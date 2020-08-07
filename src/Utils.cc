@@ -326,7 +326,7 @@ bool fbgemmHasAvx512Support() {
   if (!t) fprintf(stderr, "AA fbgemmHasAvx512Support = %d %d %d %d %d\n", 
        t, cpuinfo_has_x86_avx512f(), cpuinfo_has_x86_avx512bw(),
           cpuinfo_has_x86_avx512dq(), cpuinfo_has_x86_avx512vl());
-  return 0;
+  return 1;
 }
 
 bool fbgemmHasAvx2Support() {
