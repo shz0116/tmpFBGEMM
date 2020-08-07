@@ -320,17 +320,23 @@ bool fbgemmIsIntelXeonD() {
 }
 
 bool fbgemmHasAvx512Support() {
-  return (
+  bool t = (
       cpuinfo_has_x86_avx512f() && cpuinfo_has_x86_avx512bw() &&
       cpuinfo_has_x86_avx512dq() && cpuinfo_has_x86_avx512vl());
+  fprintf(stderr, "AA fbgemmHasAvx512Support = %d\n", t);
+  return t;
 }
 
 bool fbgemmHasAvx2Support() {
-  return (cpuinfo_has_x86_avx2());
+  bool t = (cpuinfo_has_x86_avx2());
+  fprintf(stderr, "AA fbgemmHasAvx2Support = %d\n", t);
+  return t;
 }
 
 bool fbgemmHasAvx512VnniSupport() {
-  return (cpuinfo_has_x86_avx512vnni());
+  bool t = (cpuinfo_has_x86_avx512vnni());
+  fprintf(stderr, "AA fbgemmHasAvx512VnniSupport = %d\n", t);
+  return t;
 }
 
 void fbgemmPartition1D(
