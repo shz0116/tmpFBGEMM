@@ -44,10 +44,6 @@ jobs:
         echo %cd%
         cd build_static
         test\Im2ColFusedRequantizeTest.exe
-        echo "GOOD"
-        echo "Good"
-        echo "Good"
-        test\PackedRequantizeAcc16Test.exe
         if errorlevel 1 exit /b 1
 
 

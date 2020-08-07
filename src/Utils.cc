@@ -323,19 +323,21 @@ bool fbgemmHasAvx512Support() {
   bool t = (
       cpuinfo_has_x86_avx512f() && cpuinfo_has_x86_avx512bw() &&
       cpuinfo_has_x86_avx512dq() && cpuinfo_has_x86_avx512vl());
-  if (!t) fprintf(stderr, "AA fbgemmHasAvx512Support = %d\n", t);
-  return t;
+  if (!t) fprintf(stderr, "AA fbgemmHasAvx512Support = %d %d %d %d %d\n", 
+       t, cpuinfo_has_x86_avx512f(), cpuinfo_has_x86_avx512bw(),
+          cpuinfo_has_x86_avx512dq(), cpuinfo_has_x86_avx512vl());
+  return 0;
 }
 
 bool fbgemmHasAvx2Support() {
   bool t = (cpuinfo_has_x86_avx2());
-  if (!t) fprintf(stderr, "AA fbgemmHasAvx2Support = %d\n", t);
+//  if (!t) fprintf(stderr, "AA fbgemmHasAvx2Support = %d\n", t);
   return t;
 }
 
 bool fbgemmHasAvx512VnniSupport() {
   bool t = (cpuinfo_has_x86_avx512vnni());
-  if (t) fprintf(stderr, "AA fbgemmHasAvx512VnniSupport = %d\n", t);
+//  if (t) fprintf(stderr, "AA fbgemmHasAvx512VnniSupport = %d\n", t);
   return t;
 }
 
