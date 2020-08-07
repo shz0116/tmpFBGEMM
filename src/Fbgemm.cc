@@ -196,9 +196,9 @@ void fbgemmPacked(
         t_start = std::chrono::high_resolution_clock::now();
 #endif
 
-        if (kb == 0) printf("Finished stage 4 for g = %d\n", g);
+//        if (kb == 0) printf("Finished stage 4 for g = %d\n", g);
         exeKernelObj.execute(g * kBlocks + kb);
-        if (kb == 0) printf("Finished stage 5 for g = %d\n", g);
+//        if (kb == 0) printf("Finished stage 5 for g = %d\n", g);
 
 #ifdef FBGEMM_MEASURE_TIME_BREAKDOWN
         t_end = std::chrono::high_resolution_clock::now();

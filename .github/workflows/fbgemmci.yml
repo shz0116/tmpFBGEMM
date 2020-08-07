@@ -44,31 +44,11 @@ jobs:
         echo %cd%
         cd build_static
         test\Im2ColFusedRequantizeTest.exe
+        echo "GOOD"
+        echo "Good"
+        echo "Good"
         test\PackedRequantizeAcc16Test.exe
         if errorlevel 1 exit /b 1
 
-    - name: Build shared FBGEMM lib
-      shell: cmd
-      run: |
-        call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" x64
-        echo "INSTALL NINJA:"
-        pip install ninja
-        which ninja
-        mkdir build_shared
-        cd build_shared
-        echo "STARTING CMAKE"
-        cmake -G Ninja -DFBGEMM_BUILD_BENCHMARKS=OFF -DFBGEMM_LIBRARY_TYPE=shared -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER="cl.exe" -DCMAKE_CXX_COMPILER="cl.exe" ..
-        ninja all
-        if errorlevel 1 exit /b 1
-
-    - name: Test shared FBGEMM lib
-      shell: cmd
-      run: |
-        echo %cd%
-        cd build_shared
-        set PATH=%PATH%;%cd%;%cd%\asmjit
-        echo %PATH%
-        ctest
-        if errorlevel 1 exit /b 1
 
 
