@@ -565,9 +565,11 @@ static void Im2col3DTest(bool b_symmetric) {
       if (conv_p.IC % groups != 0 || conv_p.OC % groups != 0) {
         continue;
       }
-      GTEST_COUT << "Start OC= " << conv_p.OC << " group= " << groups << std::endl;
 
       conv_p.G = groups;
+      GTEST_COUT << "Start OC= " << conv_p.OC << " group= " << groups << std::endl;
+      GTEST_COUT << "AAAAA IN " << conv_p.IN_DIM[0] << ", " << conv_p.IN_DIM[1] << ", " << conv_p.IN_DIM[2] << " groups " << groups << std::endl;
+
       aligned_vector<uint8_t> Aint8(
           conv_p.MB * conv_p.IN_DIM[0] * conv_p.IN_DIM[1] * conv_p.IN_DIM[2] *
           conv_p.IC);
@@ -728,6 +730,7 @@ static void Im2col3DTest(bool b_symmetric) {
 
       GTEST_COUT << "Point 10" << std::endl;
       // correctness check
+      printf("IN %d %d %d\n", conv_p.IN_DIM[0], conv_p.IN_DIM[1], conv_p.IN_DIM[2]);
       for (int n = 0; n < conv_p.MB; ++n) {
         for (int t = 0; t < conv_p.OUT_DIM[0]; ++t) {
           for (int h = 0; h < conv_p.OUT_DIM[1]; ++h) {
@@ -747,7 +750,8 @@ static void Im2col3DTest(bool b_symmetric) {
                      k];
                 EXPECT_EQ(actual, expected)
                     << "Im2Col fused results differ at (" << n << ", " << t
-                    << ", " << h << ", " << w << ", " << k << ").";
+                    << ", " << h << ", " << w << ", " << k << ")."
+                    << " MB " << conv_p.MB << " IN " << conv_p.IN_DIM[0] << " pad " << conv_p.pad[5];
               }
             }
           }

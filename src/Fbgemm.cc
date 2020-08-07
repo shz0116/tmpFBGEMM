@@ -19,6 +19,26 @@ double run_time = 0.0;
 
 namespace fbgemm {
 
+void printInstSet(inst_set_t isa) {
+  switch (isa) {
+    case inst_set_t::avx512_vnni:
+      printf("INST: AVX512VNNI\n");
+      break;
+    case inst_set_t::avx512:
+      printf("INST: AVX512\n");
+      break;
+    case inst_set_t::avx512_ymm:
+      printf("INST: AVX512_YMM\n");
+      break;
+    case inst_set_t::avx2:
+      printf("INST: AVX2\n");
+      break;
+    case inst_set_t::anyarch:
+      printf("INST: ANYARCH\n");
+      break;
+  }
+}
+
 template <
     typename packingAMatrix,
     typename packingBMatrix,
@@ -74,6 +94,7 @@ void fbgemmPacked(
     MR = blocking_params->MR;
   } else {
     const inst_set_t isa = fbgemmInstructionSet();
+    printInstSet(isa);
     switch (isa) {
       case inst_set_t::avx512_vnni:
         std::tie(MCB, KCB, MR) = PackingTraits<
@@ -186,9 +207,9 @@ void fbgemmPacked(
         t_start = std::chrono::high_resolution_clock::now();
 #endif
 
-//        if (kb == 0) fprintf(stderr,"Finished stage 4 for g = %d\n", g);
+//        if (kb >= 0) fprintf(stderr,"Finished stage 4 for g = %d\n", g);
         exeKernelObj.execute(g * kBlocks + kb);
-//        if (kb == 0) fprintf(stderr,"Finished stage 5 for g = %d\n", g);
+//        if (kb >= 0) fprintf(stderr,"Finished stage 5 for g = %d\n", g);
 
 #ifdef FBGEMM_MEASURE_TIME_BREAKDOWN
         t_end = std::chrono::high_resolution_clock::now();

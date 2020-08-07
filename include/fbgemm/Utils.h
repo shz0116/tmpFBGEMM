@@ -43,6 +43,8 @@ enum class matrix_op_t { NoTranspose, Transpose };
  */
 enum class inst_set_t { anyarch, avx2, avx512, avx512_ymm, avx512_vnni };
 
+extern void printInstSet(inst_set_t isa);
+
 /**
  * @brief Typed enum for optimized paths for convolutions
  */
