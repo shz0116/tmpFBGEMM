@@ -41,6 +41,8 @@ INSTANTIATE_TEST_CASE_P(
         ::testing::ValuesIn(qGranularityVals),
         ::testing::Bool()));
 
+#define GTEST_COUT std::cerr << "[          ] [ INFO ]"
+
 // clang-format off
 // From Faster-RCNN with ShuffleNet
 static vector<conv_param_t<>> shapes = {
@@ -745,10 +747,13 @@ TEST_P(fbgemmIm2colTest, 3DAcc32Test) {
   bool b_symmetric;
   tie(q_granularity, b_symmetric) = GetParam();
   if (q_granularity == QuantizationGranularity::TENSOR) {
+    GTEST_COUT << "Testing TENSOR\n" << std::endl;
     Im2col3DTest<int32_t, QuantizationGranularity::TENSOR>(b_symmetric);
   } else if (q_granularity == QuantizationGranularity::GROUP) {
+    GTEST_COUT << "Testing GROUP\n" << std::endl;
     Im2col3DTest<int32_t, QuantizationGranularity::GROUP>(b_symmetric);
   } else {
+    GTEST_COUT << "Testing CHANNEL\n" << std::endl;
     Im2col3DTest<int32_t, QuantizationGranularity::OUT_CHANNEL>(b_symmetric);
   }
 }
@@ -758,10 +763,13 @@ TEST_P(fbgemmIm2colTest, 3DAcc16Test) {
   bool b_symmetric;
   tie(q_granularity, b_symmetric) = GetParam();
   if (q_granularity == QuantizationGranularity::TENSOR) {
+    GTEST_COUT << "Testing Acc16 TENSOR\n" << std::endl;
     Im2col3DTest<int16_t, QuantizationGranularity::TENSOR>(b_symmetric);
   } else if (q_granularity == QuantizationGranularity::GROUP) {
+    GTEST_COUT << "Testing Acc16 GROUP\n" << std::endl;
     Im2col3DTest<int16_t, QuantizationGranularity::GROUP>(b_symmetric);
   } else {
+    GTEST_COUT << "Testing Acc16 CHANNEL\n" << std::endl;
     Im2col3DTest<int16_t, QuantizationGranularity::OUT_CHANNEL>(b_symmetric);
   }
 }
