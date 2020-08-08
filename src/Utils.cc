@@ -332,8 +332,9 @@ bool fbgemmHasAvx512Support() {
   if (times == 0) {
     save = t;
   } else {
-    if (t != oldt) {
+    if (t != save) {
       fprintf("ERROR at times %d t is not equal to oldt\n", times, t, oldt);
+      save = t;
     }
   }
 
