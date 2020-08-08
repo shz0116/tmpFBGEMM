@@ -321,7 +321,7 @@ bool fbgemmIsIntelXeonD() {
 
 bool fbgemmHasAvx512Support() {
   static int times = 0;
-  static bool save;
+  static bool savet;
 
   bool t = (
       cpuinfo_has_x86_avx512f() && cpuinfo_has_x86_avx512bw() &&
@@ -330,11 +330,11 @@ bool fbgemmHasAvx512Support() {
        t, cpuinfo_has_x86_avx512f(), cpuinfo_has_x86_avx512bw(),
           cpuinfo_has_x86_avx512dq(), cpuinfo_has_x86_avx512vl());
   if (times == 0) {
-    save = t;
+    savet = t;
   } else {
-    if (t != save) {
-      fprintf("ERROR at times %d t is not equal to oldt\n", times, t, oldt);
-      save = t;
+    if (t != savet) {
+      fprintf(stderr, "ERROR at times %d t %d is not equal to saved %d \n", times, t, savet);
+      savet = t;
     }
   }
 
