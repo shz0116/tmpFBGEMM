@@ -321,14 +321,24 @@ bool fbgemmIsIntelXeonD() {
 
 bool fbgemmHasAvx512Support() {
   static int times = 0;
+  static bool save;
+
   bool t = (
       cpuinfo_has_x86_avx512f() && cpuinfo_has_x86_avx512bw() &&
       cpuinfo_has_x86_avx512dq() && cpuinfo_has_x86_avx512vl());
   if (times < 5) fprintf(stderr, "AA fbgemmHasAvx512Support = %d %d %d %d %d\n", 
        t, cpuinfo_has_x86_avx512f(), cpuinfo_has_x86_avx512bw(),
           cpuinfo_has_x86_avx512dq(), cpuinfo_has_x86_avx512vl());
+  if (times == 0) {
+    save = t;
+  } else {
+    if (t != oldt) {
+      fprintf("ERROR at times %d t is not equal to oldt\n", times, t, oldt);
+    }
+  }
+
   times++;
-  return 0;
+  return t;
 }
 
 bool fbgemmHasAvx2Support() {
