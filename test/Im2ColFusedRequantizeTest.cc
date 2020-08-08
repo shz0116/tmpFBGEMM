@@ -25,9 +25,11 @@ using namespace std;
 using namespace fbgemm;
 
 vector<QuantizationGranularity> qGranularityVals{
-    QuantizationGranularity::TENSOR,
-    QuantizationGranularity::GROUP,
-    QuantizationGranularity::OUT_CHANNEL};
+    QuantizationGranularity::TENSOR};
+//    QuantizationGranularity::GROUP,
+//    QuantizationGranularity::OUT_CHANNEL};
+
+vector<bool> bValues{false};
 
 namespace {
 class fbgemmIm2colTest
@@ -39,9 +41,9 @@ INSTANTIATE_TEST_CASE_P(
     fbgemmIm2colTest,
     ::testing::Combine(
         ::testing::ValuesIn(qGranularityVals),
-        ::testing::Bool()));
+        ::testing::ValuesIn(bValues)));
 
-#define GTEST_COUT std::cerr << "[          ] [ INFO ]"
+#define GTEST_COUT std::cerr 
 
 // clang-format off
 // From Faster-RCNN with ShuffleNet
@@ -562,7 +564,7 @@ static vector<conv_param_t<3>> shapes_3d = {
 template <typename ACC_T, QuantizationGranularity Q_GRAN>
 static void Im2col3DTest(bool b_symmetric) {
   for (auto conv_p : shapes_3d) {
-    for (int groups : {1, 4}) {
+    for (int groups : {1}) {
       if (conv_p.IC % groups != 0 || conv_p.OC % groups != 0) {
         continue;
       }
@@ -617,8 +619,6 @@ static void Im2col3DTest(bool b_symmetric) {
       int KDim = conv_p.K[0] * conv_p.K[1] * conv_p.K[2] * conv_p.IC;
       int KDimPerGroup = KDim / conv_p.G;
 
-      GTEST_COUT << "Point 1" << std::endl;
-
       // computing row offset
       vector<int32_t> row_offsets(MDim);
       vector<uint8_t> Aint8_im2col(MDim * KDim);
@@ -637,16 +637,12 @@ static void Im2col3DTest(bool b_symmetric) {
             ncols_per_quant_group);
       }
 
-      GTEST_COUT << "Point 2" << std::endl;
-
       conv_ref(
           conv_p,
           Aint8.data(),
           Aint8_zero_point,
           Bint8.data(),
           Cint32_ref.data());
-
-      GTEST_COUT << "Point 3" << std::endl;
 
       for (int g = 0; g < conv_p.G; ++g) {
         row_offsets_u8acc32_ref(
@@ -672,7 +668,6 @@ static void Im2col3DTest(bool b_symmetric) {
             ncols_per_quant_group);
       }
 
-      GTEST_COUT << "Point 4 reference " << std::endl;
       PackBMatrix<int8_t, ACC_T> packedB(
           matrix_op_t::NoTranspose,
           KDim,
@@ -682,7 +677,6 @@ static void Im2col3DTest(bool b_symmetric) {
           nullptr,
           conv_p.G);
 
-      GTEST_COUT << "Point 5" << std::endl;
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
@@ -690,7 +684,6 @@ static void Im2col3DTest(bool b_symmetric) {
         vector<int32_t> row_offset_buf(
             PackAWithIm2Col<uint8_t, ACC_T, 3>::rowOffsetBufferSize());
 
-        GTEST_COUT << "Point 6" << std::endl;
         PackAWithIm2Col<uint8_t, ACC_T, 3> packA(
             conv_p,
             Aint8.data(),
@@ -699,7 +692,6 @@ static void Im2col3DTest(bool b_symmetric) {
             row_offset_buf.data(),
             b_symmetric);
 
-        GTEST_COUT << "Point 7" << std::endl;
         DoNothing<> doNothingObj{};
         ReQuantizeOutput<false, Q_GRAN> outputProcObj(
             doNothingObj,
@@ -784,7 +776,10 @@ TEST_P(fbgemmIm2colTest, 3DAcc32Test) {
 TEST_P(fbgemmIm2colTest, 3DAcc16Test) {
   QuantizationGranularity q_granularity;
   bool b_symmetric;
-  tie(q_granularity, b_symmetric) = GetParam();
+  // tie(q_granularity, b_symmetric) = GetParam();
+  q_granularity = QuantizationGranularity::TENSOR;
+  b_symmetric = false;
+
   if (q_granularity == QuantizationGranularity::TENSOR) {
     GTEST_COUT << "Testing Acc16 TENSOR\n" << std::endl;
     Im2col3DTest<int16_t, QuantizationGranularity::TENSOR>(b_symmetric);

@@ -14,6 +14,7 @@
 #include <limits>
 #include <memory>
 #include <type_traits>
+#include <cpuinfo.h>
 #include "./ConvUtils.h"
 #include "./FbgemmBuild.h"
 #include "./FbgemmEmbedding.h"
@@ -1182,7 +1183,7 @@ class FBGEMM_API ReQuantizeOutput {
         bias_(bias),
         ncols_(nCol),
         groups_(groups),
-        act_times_w_scale_(act_times_w_scale) {}
+        act_times_w_scale_(act_times_w_scale) {cpuinfo_initialize();}
 
   template <inst_set_t instSet>
   inline int f(
